@@ -1,0 +1,26 @@
+from pyglet.window import key
+
+class Config:
+    TARGET_FRAME_RATE = 30
+
+    CELL_SIZE = 2
+    GRID_HEIGHT = 300
+    GRID_WIDTH = 300
+
+    WINDOW_HEIGHT = CELL_SIZE * GRID_HEIGHT
+    WINDOW_WIDTH = CELL_SIZE * GRID_WIDTH
+
+    INITIAL_LIFE_CHANCE = 0.2
+
+    RGB_ALIVE = (0, 120, 30, 255)
+    RGB_DEAD = (40, 40, 40, 255)
+
+    SAND_MODE_GRAVITY = 1
+    MAX_VELOCITY = 10
+
+    # KEYBOARD SHORTCUTS
+    KB_NEXT_PRESET = key.S
+    KB_SWITCH_MODE = key.LSHIFT
+    KB_PRINT_BALANCE = key.B
+    KB_CLEAR_SCREEN = key.C
+    KB_PAUSE = key.SPACE
