@@ -42,10 +42,18 @@ class SandMode(Mode):
         new_y_vel_map = np.zeros_like(self._y_vel_map)
 
         # Use vectorized operations to find living cells
+        # allows us to speed up processing by only checking cells with sand in them
         living_cells = np.argwhere(current_grid)
         
+        
+        # Sort living cells in zigzag order based on their x-coordinates
+        # This removes the directional bias introduced by checking side-to-side
+        living_cells = sorted(living_cells, key=lambda cell: (cell[0], cell[1] if cell[1] % 2 == 0 else -cell[1]))
+
         for y, x in living_cells:
             new_y, new_x = y, x  # Initialize new position as old position
+            
+            
             velocity = self._y_vel_map[y, x] - self.gravity  # Apply gravity
 
             step = 0
@@ -71,21 +79,19 @@ class SandMode(Mode):
                             new_x += 1
                             new_y -= 1
                             step += 2
-                        else: 
+                        else:
+                            velocity = 0 
                             break
                     else:
                         new_y -= 1
                         step += 1
 
-            velocity = new_y - y - 1
-
-            self.rand_idx += 1
-
+                    self.rand_idx += 1
             # Update new grid and velocity map
             new_data_grid[new_y, new_x] = True
             new_y_vel_map[new_y, new_x] = max(velocity, cfg.SAND_MAX_Y_VEL)
             
-
+        np.random.shuffle(self.random_directions)
         self.changed_cells = np.argwhere(current_grid != new_data_grid)
         self._y_vel_map = new_y_vel_map
         return new_data_grid

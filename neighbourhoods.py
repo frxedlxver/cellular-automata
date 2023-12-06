@@ -25,7 +25,7 @@ class Neighbourhood:
     ExMoore = {
         "name" : "ExMoore",
         "shape": NbShape.Square,
-        "range": 5
+        "range": 3
     }
     Lonely = {
         "name" : "Lonely",

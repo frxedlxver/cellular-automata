@@ -118,12 +118,6 @@ class CellularAutomataWindow(pyglet.window.Window):
         if self.mouse_held:
             if (abs(self.current_mouse_x - x) >= Settings.CELL_WIDTH or abs(self.current_mouse_y - y) >= Settings.CELL_HEIGHT):
                 self.update_cached_mouse_position(x, y)
-            
-            if (buttons & mouse.LEFT):
-                self.apply_click_effect(0, True)
-            
-            if (buttons & mouse.RIGHT):
-                self.apply_click_effect(0, False)
 
 
     def on_mouse_release(self, x, y, button, modifiers):

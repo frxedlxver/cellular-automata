@@ -18,8 +18,8 @@ class Settings:
     ]
     
     # grid
-    GRID_HEIGHT     = 300
-    GRID_WIDTH      = 300
+    GRID_HEIGHT     = 200
+    GRID_WIDTH      = 200
     GRID_SIZE       = (GRID_HEIGHT, GRID_WIDTH)
 
     # visual grid
