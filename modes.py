@@ -31,13 +31,12 @@ class SandMode(Mode):
         super().__init__(Neighbourhood.ExMoore)
         self.height, self.width = cfg.GRID_HEIGHT, cfg.GRID_WIDTH
         self._y_vel_map = np.zeros((self.height, self.width), dtype=int)
-        self.random_bools = np.random.choice(a=[False, True], size=self.height)
+        self.random_directions = np.random.choice(a=[1, -1], size=self.height)
         self.rand_idx = 0
         self.max_rand_idx = self.height - 1
         self.gravity = cfg.SAND_GRAVITY
-        
-        
-    
+
+
     def update(self, current_grid):
         new_data_grid = np.zeros_like(current_grid)
         new_y_vel_map = np.zeros_like(self._y_vel_map)
@@ -46,56 +45,51 @@ class SandMode(Mode):
         living_cells = np.argwhere(current_grid)
         
         for y, x in living_cells:
+            new_y, new_x = y, x  # Initialize new position as old position
+            velocity = self._y_vel_map[y, x] - self.gravity  # Apply gravity
 
+            step = 0
+            while step < abs(velocity):
+                can_move_down = not new_data_grid[new_y - 1, new_x]  # Move down if possible
 
-            # initialize new position as old position
-            new_y, new_x = y, x
+                if new_y == 0 or (velocity == 0 and not can_move_down):
+                    break
+                else:
+                    if (new_x == x and velocity < -2) or not can_move_down:  # Check diagonal movements
+                        can_move_left = new_x > 0 and new_y > 0 and not new_data_grid[new_y - 1, new_x - 1]
+                        can_move_right = new_x < cfg.GRID_WIDTH - 1 and new_y > 0 and not new_data_grid[new_y - 1, new_x + 1]
 
-            # if at bottom, dont move down
-            if y > 0:
-                # can move down if no cell below, or cell below has velocity
-                can_move_down = (not current_grid[y-1][x] or new_y_vel_map[y-1, x] > 0)
-                
-                if can_move_down:
-                    # get velocity of current cell and apply gravity
-                    velocity = self._y_vel_map[y, x] - self.gravity
-                    # check each position in range of velocity, move to furthest open tile
-                    for step in range(abs(velocity)):
-                        if new_y > 0 and not new_data_grid[new_y - 1][new_x]:
-                            new_y -= 1  # Move down if the cell below is empty
-
-                    # slow down if movement is obstructed
-                    if new_y > y - velocity:
-                        velocity = y - new_y
-                
-                else: # Check diagonal movement if direct down is blocked
-                    move_down_left = new_x > 0 and new_y > 0 and not new_data_grid[new_y - 1][new_x - 1]
-                    move_down_right = new_x < cfg.GRID_WIDTH - 1 and new_y > 0 and not new_data_grid[new_y - 1][new_x + 1]
-
-                    if move_down_left and not move_down_right:
-                        new_x -= 1
-                        new_y -= 1
-                    elif move_down_right and not move_down_left:
-                        new_x += 1
-                        new_y -= 1
-                    elif move_down_left and move_down_right:
-                        if self.random_bools[(y + self.rand_idx) % self.max_rand_idx]:
+                        if can_move_left and can_move_right:
+                            new_x += self.random_directions[(y + self.rand_idx) % self.height]
+                            new_y -= 1
+                            step += 2
+                        elif can_move_left:
                             new_x -= 1
-                        else:
+                            new_y -= 1
+                            step += 2
+                        elif can_move_right:
                             new_x += 1
+                            new_y -= 1
+                            step += 2
+                        else: 
+                            break
+                    else:
                         new_y -= 1
-                        self.rand_idx += 1
-            else:
-                velocity = 0
+                        step += 1
 
-            
+            velocity = new_y - y - 1
+
+            self.rand_idx += 1
+
             # Update new grid and velocity map
             new_data_grid[new_y, new_x] = True
             new_y_vel_map[new_y, new_x] = max(velocity, cfg.SAND_MAX_Y_VEL)
+            
 
         self.changed_cells = np.argwhere(current_grid != new_data_grid)
         self._y_vel_map = new_y_vel_map
         return new_data_grid
+
     
 
 class WaterMode(Mode):

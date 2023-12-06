@@ -5,12 +5,12 @@ from direction import Direction as dir
 
 class Settings:
 
-    SIMULATION_FRAME_RATE = 30
-    SAND_FRAME_RATE = 60
-    VISUAL_FRAME_RATE = 30
+    SIMULATION_FRAME_RATE   = 30
+    SAND_FRAME_RATE         = 60
+    VISUAL_FRAME_RATE       = 30
 
     # cells
-    CELL_HEIGHT       = 3
+    CELL_HEIGHT     = 3
     CELL_WIDTH      = 3
     CELL_STATES = [
         CellState('Alive', (120, 120, 30, 255)),

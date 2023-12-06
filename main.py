@@ -47,9 +47,11 @@ class CellularAutomataWindow(pyglet.window.Window):
         self.click_changed_cells = np.empty((0, 2), dtype=int)
 
     
-        
     def update(self, dt):
         self.update_data()
+        if self._clear_screen_pressed:
+            self.clear_screen()
+            self._clear_screen_pressed = False
         self.update_visuals()
 
     def update_data(self):

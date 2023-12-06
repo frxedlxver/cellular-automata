@@ -25,7 +25,7 @@ class Neighbourhood:
     ExMoore = {
         "name" : "ExMoore",
         "shape": NbShape.Square,
-        "range": 2
+        "range": 5
     }
     Lonely = {
         "name" : "Lonely",
@@ -54,5 +54,6 @@ class Neighbourhood:
         scaled_shape = []
         for offset in nb_shape:
             for r in range(-nb_scale, nb_scale + 1):
-                scaled_shape.append([offset[0] + r, offset[1] + r])
+                for r2 in range(-nb_scale, nb_scale + 1):
+                    scaled_shape.append([offset[0] + r, offset[1] + r2])
         return np.array(scaled_shape)
