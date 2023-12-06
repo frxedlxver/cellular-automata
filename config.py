@@ -1,26 +1,63 @@
 from pyglet.window import key
+from cell_state import CellState
+from direction import Direction as dir
 
-class Config:
-    TARGET_FRAME_RATE = 30
 
-    CELL_SIZE = 2
-    GRID_HEIGHT = 300
-    GRID_WIDTH = 300
+class Settings:
 
-    WINDOW_HEIGHT = CELL_SIZE * GRID_HEIGHT
-    WINDOW_WIDTH = CELL_SIZE * GRID_WIDTH
+    SIMULATION_FRAME_RATE = 30
+    SAND_FRAME_RATE = 60
+    VISUAL_FRAME_RATE = 30
 
+    # cells
+    CELL_HEIGHT       = 3
+    CELL_WIDTH      = 3
+    CELL_STATES = [
+        CellState('Alive', (120, 120, 30, 255)),
+        CellState('Dead', (40, 40, 40, 255))
+    ]
+    
+    # grid
+    GRID_HEIGHT     = 300
+    GRID_WIDTH      = 300
+    GRID_SIZE       = (GRID_HEIGHT, GRID_WIDTH)
+
+    # visual grid
+    VISUAL_GRID_HEIGHT = CELL_HEIGHT * GRID_HEIGHT
+    VISUAL_GRID_WIDTH = CELL_WIDTH * GRID_WIDTH
+
+    #window
+    WINDOW_MARGIN = {
+        dir.Top     : 50,
+        dir.Right   : 50,
+        dir.Bottom  : 50,
+        dir.Left    : 50
+    }
+
+    WINDOW_HEIGHT       = VISUAL_GRID_HEIGHT + WINDOW_MARGIN[dir.Top] + WINDOW_MARGIN[dir.Bottom]
+    WINDOW_WIDTH        = VISUAL_GRID_WIDTH + WINDOW_MARGIN[dir.Left] + WINDOW_MARGIN[dir.Right]
     INITIAL_LIFE_CHANCE = 0.2
 
-    RGB_ALIVE = (0, 120, 30, 255)
-    RGB_DEAD = (40, 40, 40, 255)
+    # sand mode
+    SAND_GRAVITY = 1
+    SAND_MAX_Y_VEL = -10
 
-    SAND_MODE_GRAVITY = 1
-    MAX_VELOCITY = 10
+class Controls:
 
-    # KEYBOARD SHORTCUTS
-    KB_NEXT_PRESET = key.S
-    KB_SWITCH_MODE = key.LSHIFT
-    KB_PRINT_BALANCE = key.B
-    KB_CLEAR_SCREEN = key.C
-    KB_PAUSE = key.SPACE
+    # CELLULAR AUTOMATA MODE ONLY
+    NEXT_PRESET = key.S
+    SMOOTH = key.LSHIFT
+
+    # SAND MODE ONLY
+    PRINT_BALANCE = key.B
+
+    # ALL MODES
+    CLEAR_SCREEN = key.C
+    PAUSE = key.SPACE
+    ADVANCE_FRAME = key.ENTER
+
+    # MODE SELECTION
+    CA_MODE = key.NUM_1
+    SAND_MODE = key.NUM_2
+    TRAIL_MODE = key.NUM_4
+    WATER_MODE = key.NUM_3

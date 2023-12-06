@@ -1,72 +1,98 @@
 import numpy as np
 import pyglet
 from pyglet.window import mouse as mouse
-from config import Config
+from config import Settings
+from config import Controls
+from direction import Direction as dir
 import modes
 
 class CellularAutomataWindow(pyglet.window.Window):
 
     def __init__(self):
         super().__init__()
-        self.width = Config.WINDOW_WIDTH
-        self.height = Config.WINDOW_HEIGHT
+        
+        # cached settings
+        self.width = Settings.WINDOW_WIDTH
+        self.height = Settings.WINDOW_HEIGHT
+        self._grid_size = (Settings.GRID_WIDTH, Settings.GRID_HEIGHT)
+        self._frames_between_visual_updates = 3
+        self._current_frame_in_cycle = 0
+        self._alive_color = Settings.CELL_STATES[0].color
+        self._dead_color = Settings.CELL_STATES[1].color
+
+        # pyglet
         self._batch = pyglet.graphics.Batch()
+        
+        # flags
         self.mouse_held = False
-        self._CA_mode = modes.CellularAutomataMode()
-        self._sand_mode = modes.SandMode()
-        self._mode = self._CA_mode
+        self._paused = False
+        self._clear_screen_pressed = False
+        
+        # modes
+        self._modes = {
+            'CA'    : modes.CellularAutomataMode(),
+            'SAND'  : modes.SandMode(),
+            'TRAIL' : modes.TrailMode(),
+            'WATER' : modes.WaterMode()
+        }
+        self._mode = self._modes['CA']
         self._neighbourhood = self._mode.neighbourhood()
+
+        # grid
         self.initialize_data_grid()
-        self._visual_grid = []
         self.initialize_visual_grid()
         self.velocity_map = {}
-        self._paused = False
+
+        # array for tracking cells changed by click, used in updating visual grid
+        self.click_changed_cells = np.empty((0, 2), dtype=int)
+
     
         
     def update(self, dt):
+        self.update_data()
+        self.update_visuals()
+
+    def update_data(self):
+        # update data grid every frame
         self._data_grid = self._mode.update(self._data_grid)
-        self.update_visual_grid()
 
+    def update_visuals(self):
+        changed_cells = np.unique(np.vstack([self._mode.changed_cells, self.click_changed_cells]), axis=0)
 
-    def get_cell_color(self, cell_state):
-        return Config.RGB_ALIVE if cell_state else Config.RGB_DEAD
-        
+        if changed_cells.size > 0:
+            # Update only the cells in the changed_cells set
+            for y, x in changed_cells:
+                self._visual_grid[y, x].color = self._alive_color if self._data_grid[y,x] else self._dead_color
+
+        # Reset the click changes after updating
+        self.click_changed_cells = np.empty((0, 2), dtype=int)
+
 
     def initialize_data_grid(self):
-        self._data_grid = np.zeros((Config.GRID_HEIGHT, Config.GRID_WIDTH), dtype=bool)
-        for y in range(Config.GRID_HEIGHT):
-            for x in range(Config.GRID_WIDTH):
+        self._data_grid = np.random.randint(0, len(Settings.CELL_STATES), size=self._grid_size)
+        np.random.randint(0, 3)
+        for y in range(Settings.GRID_HEIGHT):
+            for x in range(Settings.GRID_WIDTH):
                 # set cell as alive if random float falls between 0 and INITIAL_LIFE_CHANCE
-                self._data_grid[y][x] = np.random.rand() < Config.INITIAL_LIFE_CHANCE
+                self._data_grid[y][x] = np.random.rand() < Settings.INITIAL_LIFE_CHANCE
 
 
     def initialize_visual_grid(self):
-        for y in range(Config.GRID_HEIGHT):
-            row = []
-            for x in range(Config.GRID_WIDTH):
-                is_alive = self._data_grid[y][x]
-                
-                color = Config.RGB_ALIVE if is_alive else Config.RGB_DEAD
+        self._visual_grid = np.empty((Settings.GRID_HEIGHT, Settings.GRID_WIDTH), dtype=object)
 
-                # create cell and add to batch
-                cell = pyglet.shapes.Rectangle(x=x * Config.CELL_SIZE, y=y * Config.CELL_SIZE, 
-                                            width=Config.CELL_SIZE, height=Config.CELL_SIZE, 
-                                            color=color, batch=self._batch)
-                
-                # add cell to visual grid for updating
-                row.append(cell)
-            self._visual_grid.append(row)
-
-
-    def update_visual_grid(self):
-            for (y, x) in self._mode.changed_cells:
-                # Update the visual representation for the changed cell
-                self._visual_grid[y][x].color = self.get_cell_color(self._data_grid[y][x])
-
-                
-
-    def update_cell_color(self, x, y, new_cell_color):
-        self._visual_grid[y][x].color = new_cell_color
+        adjusted_y_values = np.arange(stop=Settings.VISUAL_GRID_HEIGHT + Settings.CELL_HEIGHT, step=Settings.CELL_HEIGHT) + Settings.WINDOW_MARGIN[dir.Top]
+        adjusted_x_values = np.arange(stop=Settings.VISUAL_GRID_WIDTH + Settings.CELL_WIDTH, step=Settings.CELL_WIDTH) + Settings.WINDOW_MARGIN[dir.Left]
+        
+        for y in range(Settings.GRID_HEIGHT):
+            y_pos_in_window = adjusted_y_values[y]
+            for x in range(Settings.GRID_WIDTH):
+                x_pos_in_window = adjusted_x_values[x]
+                cell_state = self._data_grid[y, x]
+                color = self._alive_color if cell_state else self._dead_color
+                cell = pyglet.shapes.Rectangle(x=x_pos_in_window, y=y_pos_in_window, 
+                                               width=Settings.CELL_WIDTH, height=Settings.CELL_HEIGHT, 
+                                               color=color, batch=self._batch)
+                self._visual_grid[y][x] = cell
 
 
     def on_draw(self):
@@ -83,16 +109,18 @@ class CellularAutomataWindow(pyglet.window.Window):
 
         # Determine the new cell state based on the button pressed
         new_cell_state = button == mouse.LEFT
-        pyglet.clock.schedule_interval(self.apply_click_effect, 1/Config.TARGET_FRAME_RATE, new_cell_state)
+        pyglet.clock.schedule_interval(self.apply_click_effect, 1/Settings.SIMULATION_FRAME_RATE, new_cell_state)
 
 
     def on_mouse_drag(self, x, y, dx, dy, buttons, modifiers):
         if self.mouse_held:
-            if (abs(self.current_mouse_x - x) >= Config.CELL_SIZE or abs(self.current_mouse_y - y) >= Config.CELL_SIZE):
+            if (abs(self.current_mouse_x - x) >= Settings.CELL_WIDTH or abs(self.current_mouse_y - y) >= Settings.CELL_HEIGHT):
                 self.update_cached_mouse_position(x, y)
+            
             if (buttons & mouse.LEFT):
                 self.apply_click_effect(0, True)
-            elif(buttons & mouse.RIGHT):
+            
+            if (buttons & mouse.RIGHT):
                 self.apply_click_effect(0, False)
 
 
@@ -103,7 +131,7 @@ class CellularAutomataWindow(pyglet.window.Window):
 
     def update_cached_mouse_position(self, x, y):
         self.current_mouse_x, self.current_mouse_y = x, y
-        self.current_mouse_grid_x, self.current_mouse_grid_y = self.window_pos_to_grid_pos(x, y)
+        self.current_mouse_grid_x, self.current_mouse_grid_y = self.mouse_to_grid_pos(x, y)
 
 
     def apply_click_effect(self, dt, new_cell_state):
@@ -111,35 +139,63 @@ class CellularAutomataWindow(pyglet.window.Window):
             nx, ny = self.current_mouse_grid_x + dx, self.current_mouse_grid_y + dy
             if self.in_grid(nx, ny):
                 self._data_grid[ny][nx] = new_cell_state
+                self.click_changed_cells = np.vstack([self.click_changed_cells, [ny, nx]])
+
+        if self._paused:
+            self.update_visuals()
+
 
 
     def in_grid(self, x, y):
-        return x >= 0 and x < Config.GRID_WIDTH and y >= 0 and y < Config.GRID_HEIGHT
+        return x >= 0 and x < Settings.GRID_WIDTH and y >= 0 and y < Settings.GRID_HEIGHT
 
 
     def on_key_press(self, symbol, modifiers):
         match symbol:
-            case Config.KB_PRINT_BALANCE:
+            case Controls.PRINT_BALANCE:
                 self.calculate_and_print_sand_balance()
-            case Config.KB_SWITCH_MODE:
-                # Code to switch modes goes here
-                if isinstance(self._mode, modes.SandMode):
-                    self._mode = self._CA_mode
-                else:
-                    self._mode = self._sand_mode
-            case Config.KB_NEXT_PRESET:
+            case Controls.NEXT_PRESET:
                 if isinstance(self._mode, modes.CellularAutomataMode):
                     self._mode.next_preset()
-            case Config.KB_CLEAR_SCREEN:
-                self.clear_screen()
-            case Config.KB_PAUSE:
+            case Controls.CLEAR_SCREEN:
+                self._clear_screen_pressed = True
+            case Controls.PAUSE:
                 if self._paused == False:
                     self.pause()
                 else:
                     self.resume()
+            case Controls.ADVANCE_FRAME:
+                self.update(0)
+            case Controls.CA_MODE:
+                self.mode_change_key_pressed('CA', modifiers)
+            case Controls.SAND_MODE:
+                self.mode_change_key_pressed('SAND', modifiers)
+            case Controls.WATER_MODE:
+                self.mode_change_key_pressed('WATER', modifiers)
+            case Controls.SMOOTH:
+                self.smooth()
 
+    def smooth(self):
+        # cache mode to switch back after update
+        cached_mode = self._mode
+
+        # switch to trail mode and update one frame
+        self._mode = self._modes['TRAIL']
+        self.update(0)
+
+        # switch back to original mode
+        self._mode = cached_mode
+
+    def mode_change_key_pressed(self, mode_key, modifiers):
+        self._mode = self._modes[mode_key]
+
+        # if shift is pressed, advance one frame
+        if (modifiers & pyglet.window.key.MOD_SHIFT):
+            self.update(0)
+            
     def clear_screen(self):
-        self._data_grid = np.zeros_like(self._data_grid)
+        self._data_grid = np.zeros_like(self._data_grid, dtype=bool)
+        self._mode.changed_cells = np.argwhere(self._data_grid == False)
 
 
     def pause(self):
@@ -151,7 +207,7 @@ class CellularAutomataWindow(pyglet.window.Window):
         self._paused = False
 
     def calculate_and_print_sand_balance(self):
-        width, height = Config.GRID_WIDTH, Config.GRID_HEIGHT
+        width, height = Settings.GRID_WIDTH, Settings.GRID_HEIGHT
         left_side_count = 0
         right_side_count = 0
 
@@ -174,12 +230,12 @@ class CellularAutomataWindow(pyglet.window.Window):
         print("Right side count:", right_side_count)
 
 
-    def window_pos_to_grid_pos(self, click_x, click_y):
-        cell_size = Config.CELL_SIZE
-        return click_x // cell_size, click_y // cell_size
-
+    def mouse_to_grid_pos(self, mouse_x, mouse_y):
+        grid_x = (mouse_x - Settings.WINDOW_MARGIN[dir.Left]) // Settings.CELL_WIDTH 
+        grid_y = (mouse_y - Settings.WINDOW_MARGIN[dir.Top]) // Settings.CELL_HEIGHT 
+        return grid_x, grid_y
 
 if __name__ == '__main__':
     window = CellularAutomataWindow()
-    pyglet.clock.schedule_interval(window.update, interval=1/Config.TARGET_FRAME_RATE)
+    pyglet.clock.schedule_interval(window.update, interval=1/Settings.SIMULATION_FRAME_RATE)
     pyglet.app.run()

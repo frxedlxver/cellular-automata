@@ -37,9 +37,6 @@ class Neighbourhood:
     
     @staticmethod
     def get_neighbourhood(nb):
-        # Check if the neighbourhood is already cached
-        if nb['name'] in Neighbourhood._neighbourhood_cache:
-            return Neighbourhood._neighbourhood_cache[nb]
 
         shape = nb['shape']
         nb_range = nb['range']
@@ -50,8 +47,6 @@ class Neighbourhood:
             # Properly scale the neighborhood
             result = Neighbourhood.scale_neighbourhood(shape, nb_range)
 
-        # Cache and return the result
-        Neighbourhood._neighbourhood_cache[nb['name']] = result
         return result
 
     @staticmethod
