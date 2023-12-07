@@ -1,9 +1,12 @@
 import numpy as np
+import cupy as cp
 import pyglet
 from pyglet.window import mouse as mouse
 from config import Settings
 from config import Controls
 from direction import Direction as dir
+from threading import Thread
+import time
 import modes
 
 class CellularAutomataWindow(pyglet.window.Window):
@@ -45,6 +48,27 @@ class CellularAutomataWindow(pyglet.window.Window):
 
         # array for tracking cells changed by click, used in updating visual grid
         self.click_changed_cells = np.empty((0, 2), dtype=int)
+        self._r = 0
+        self._g = 0
+        self._b = 0
+        self.running = False
+        self.thread = Thread(target=self.rotate_color_threaded)
+        self.thread.start()
+
+    def rotate_color_threaded(self):
+        while True:
+            while self.running:
+                time.sleep(0.05)
+                self._r += 1
+                self._g += 2
+                self._b += 3
+                self._alive_color = (self._r, self._g, self._b, 255)
+
+    def rotate_color(self):
+        self._r += 1
+        self._g += 2
+        self._b += 3
+        self._alive_color = (self._r, self._g, self._b, 255)
 
     
     def update(self, dt):
@@ -59,6 +83,7 @@ class CellularAutomataWindow(pyglet.window.Window):
         self._data_grid = self._mode.update(self._data_grid)
 
     def update_visuals(self):
+        self.running = True
         changed_cells = np.unique(np.vstack([self._mode.changed_cells, self.click_changed_cells]), axis=0)
 
         if changed_cells.size > 0:
@@ -161,7 +186,9 @@ class CellularAutomataWindow(pyglet.window.Window):
                 else:
                     self.resume()
             case Controls.ADVANCE_FRAME:
-                self.update(0)
+                if self._paused == False:
+                    self.pause()
+                self.advance_one_frame()
             case Controls.CA_MODE:
                 self.mode_change_key_pressed('CA', modifiers)
             case Controls.SAND_MODE:
@@ -170,6 +197,9 @@ class CellularAutomataWindow(pyglet.window.Window):
                 self.mode_change_key_pressed('WATER', modifiers)
             case Controls.SMOOTH:
                 self.smooth()
+
+    def advance_one_frame(self):
+        self.update(0)
 
     def smooth(self):
         # cache mode to switch back after update
@@ -195,10 +225,12 @@ class CellularAutomataWindow(pyglet.window.Window):
 
 
     def pause(self):
+        self.running = False
         pyglet.clock.unschedule(self.update)
         self._paused = True
     
     def resume(self):
+        self.running = True
         pyglet.clock.schedule(self.update)
         self._paused = False
 

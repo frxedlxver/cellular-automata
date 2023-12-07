@@ -10,16 +10,16 @@ class Settings:
     VISUAL_FRAME_RATE       = 30
 
     # cells
-    CELL_HEIGHT     = 3
-    CELL_WIDTH      = 3
+    CELL_HEIGHT     = 2
+    CELL_WIDTH      = 2
     CELL_STATES = [
         CellState('Alive', (120, 120, 30, 255)),
         CellState('Dead', (40, 40, 40, 255))
     ]
     
     # grid
-    GRID_HEIGHT     = 200
-    GRID_WIDTH      = 200
+    GRID_HEIGHT     = 400
+    GRID_WIDTH      = 400
     GRID_SIZE       = (GRID_HEIGHT, GRID_WIDTH)
 
     # visual grid
@@ -52,7 +52,7 @@ class Controls:
     PRINT_BALANCE = key.B
 
     # ALL MODES
-    CLEAR_SCREEN = key.C
+    CLEAR_SCREEN = key.BACKSPACE
     PAUSE = key.SPACE
     ADVANCE_FRAME = key.ENTER
 
@@ -61,3 +61,8 @@ class Controls:
     SAND_MODE = key.NUM_2
     TRAIL_MODE = key.NUM_4
     WATER_MODE = key.NUM_3
+
+    # COLORS
+    TOGGLE_COLOR_ROTATION = key.C
+    INCREASE_COLOR_SPEED = key.BRACKETRIGHT
+    DECREASE_COLOR_SPEED = key.BRACKETLEFT
