@@ -10,16 +10,16 @@ class Settings:
     VISUAL_FRAME_RATE       = 30
 
     # cells
-    CELL_HEIGHT     = 2
-    CELL_WIDTH      = 2
+    CELL_HEIGHT     = 3
+    CELL_WIDTH      = 3
     CELL_STATES = [
         CellState('Alive', (120, 120, 30, 255)),
         CellState('Dead', (40, 40, 40, 255))
     ]
     
     # grid
-    GRID_HEIGHT     = 400
-    GRID_WIDTH      = 400
+    GRID_HEIGHT     = 250
+    GRID_WIDTH      = 250
     GRID_SIZE       = (GRID_HEIGHT, GRID_WIDTH)
 
     # visual grid
@@ -45,8 +45,8 @@ class Settings:
 class Controls:
 
     # CELLULAR AUTOMATA MODE ONLY
-    NEXT_PRESET = key.S
-    SMOOTH = key.LSHIFT
+    NEXT_PRESET = key.P
+    SMOOTH = key.RSHIFT
 
     # SAND MODE ONLY
     PRINT_BALANCE = key.B
