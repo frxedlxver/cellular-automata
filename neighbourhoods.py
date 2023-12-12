@@ -1,40 +1,42 @@
 import numpy as np
 
+
 class NbShape:
     Lonely = np.array([[0, 0]])
     Cross = np.array([[1, 0], [-1, 0], [0, 1], [0, -1]])
     Square = np.vstack([Cross, [[1, 1], [1, -1], [-1, 1], [-1, -1]]])
     Diamond = np.vstack([Cross, Square, [2, 0], [-2, 0], [0, 2], [0, -2]])
 
+
 class Neighbourhood:
     Von = {
-        "name" : "Von",
+        "name": "Von",
         "shape": NbShape.Cross,
         "range": 1
     }
     Moore = {
-        "name" : "Moore",
+        "name": "Moore",
         "shape": NbShape.Square,
         "range": 1
     }
     ExVon = {
-        "name" : "ExVon",
+        "name": "ExVon",
         "shape": NbShape.Cross,
         "range": 2
     }
     ExMoore = {
-        "name" : "ExMoore",
+        "name": "ExMoore",
         "shape": NbShape.Square,
         "range": 3
     }
     Lonely = {
-        "name" : "Lonely",
+        "name": "Lonely",
         "shape": NbShape.Lonely,
         "range": 1
     }
 
     _neighbourhood_cache = {}
-    
+
     @staticmethod
     def get_neighbourhood(nb):
 
