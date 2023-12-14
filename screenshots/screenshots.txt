@@ -1,0 +1,1 @@
+Take screenshots of your creations by pressing the 'S' key! They will be saved in this folder.

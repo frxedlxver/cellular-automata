@@ -69,12 +69,13 @@ class CellularAutomataWindow(pyglet.window.Window):
         self._b = 0
 
         # amount by which colors change each frame (d = delta)
-        self._dr = 1
+        self._dr = 4
         self._dg = 2
-        self._db = 3
+        self._db = 1
 
         # flag used outside of color thread to cause color loop to break
         self._color_rotation_active = False
+        self._inverse_background_color_active = False
 
         # separate flag that is used by the thread to indicate whether it has exited
         self._currently_rotating = False
@@ -86,14 +87,47 @@ class CellularAutomataWindow(pyglet.window.Window):
                                                 x=self.width // 2, y=25,
                                                 anchor_x='center', anchor_y='bottom',
                                                 batch=self._batch)
+        color_square_size = 10
+        fg_label_x_pos = 25
+        fg_square_x_pos = fg_label_x_pos + color_square_size
+        bg_label_x_pos = fg_square_x_pos + color_square_size + color_square_size
+        bg_square_x_pos = bg_label_x_pos + color_square_size
+        color_display_y_pos = self._height - 25
+
+        self._fg_color_label = pyglet.text.Label('fg:',
+                                                font_name='Times New Roman',
+                                                font_size=10,
+                                                x=fg_label_x_pos, y=color_display_y_pos,
+                                                anchor_x='center', anchor_y='bottom',
+                                                batch=self._batch)
+
+        self._fg_color_square = pyglet.shapes.Rectangle(x=fg_square_x_pos, y=color_display_y_pos,
+                                    width= color_square_size, height=color_square_size,
+                                    color=self._alive_color, batch=self._batch)
+
+
+        
+        self._bg_color_label = pyglet.text.Label('bg:',
+                                                font_name='Times New Roman',
+                                                font_size=10,
+                                                x=bg_label_x_pos, y=color_display_y_pos,
+                                                anchor_x='center', anchor_y='bottom',
+                                                batch=self._batch)
+        
+        self._bg_color_square = pyglet.shapes.Rectangle(x=bg_square_x_pos, y=color_display_y_pos,
+                                    width=10, height=10,
+                                    color=self._dead_color, batch=self._batch)
 
     def toggle_color_rotation(self):
-        if not self._color_rotation_active and not self._currently_rotating:
-            self._color_rotation_active = True;
-            self._color_thread = Thread(target=self.rotate_color_threaded)
-            self._color_thread.start()
-        else:
-            self._color_rotation_active = False
+        self._color_rotation_active = not self._color_rotation_active
+
+        # if not self._color_rotation_active and not self._currently_rotating:
+        #     self._color_rotation_active = True
+        # else:
+        #     self._color_rotation_active = False
+
+    def toggle_inverse_background_color(self):
+        self._inverse_background_color_active = not self._inverse_background_color_active
 
     def rotate_color_threaded(self):
         self._currently_rotating = True
@@ -105,16 +139,31 @@ class CellularAutomataWindow(pyglet.window.Window):
         self._currently_rotating = False
 
     def rotate_to_next_color(self):
-        self._r += 1
-        self._g += 2
-        self._b += 3
+        self._r = (self._r + self._dr) % 255
+        self._g = (self._g + self._dg) % 255
+        self._b = (self._b + self._db) % 255
         self._alive_color = (self._r, self._g, self._b, 255)
+        self._fg_color_square.color = self._alive_color
+
+    def bg_color_to_inverse_fg(self):
+        self._dead_color = (
+            255 - self._r,
+            255 - self._g,
+            255 - self._b,
+            255
+        )
+        self._bg_color_square.color = self._dead_color
+
 
     def update(self, dt):
         self.update_data()
         if self._clear_screen_pressed:
             self.clear_screen()
             self._clear_screen_pressed = False
+        if self._color_rotation_active:
+            self.rotate_to_next_color()
+        if self._inverse_background_color_active:
+            self.bg_color_to_inverse_fg()
         self.update_visuals()
 
     def update_data(self):
@@ -243,6 +292,8 @@ class CellularAutomataWindow(pyglet.window.Window):
                 if not self._paused:
                     self.pause()
                 self.advance_one_frame()
+
+            # colors
             case Controls.TOGGLE_COLOR_ROTATION:
                 command_description = 'C - TOGGLE COLOR CHANGING'
                 if not self._color_rotation_active:
@@ -250,6 +301,8 @@ class CellularAutomataWindow(pyglet.window.Window):
                 else:
                     command_description += '(OFF)'
                 self.toggle_color_rotation()
+            case pyglet.window.key.O:
+                self.toggle_inverse_background_color()
 
             # mode changing
             case Controls.CA_MODE:

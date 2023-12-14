@@ -127,9 +127,9 @@ class ExpandMode(Mode):
         self.neighbour_threshold = 7
         self._kernel = np.array([
             [1, 1, 1, 1, 1],
-            [1, 1, 1, 1, 1],
+            [1, 0, 1, 0, 1],
             [1, 1, 0, 1, 1],
-            [1, 1, 1, 1, 1],
+            [1, 0, 1, 0, 1],
             [1, 1, 1, 1, 1]])
 
     def update(self, current_data_grid):
