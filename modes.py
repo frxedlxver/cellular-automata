@@ -2,9 +2,10 @@ from neighbourhoods import Neighbourhood
 from abc import ABC, abstractmethod
 import numpy as np
 from scipy.signal import convolve2d
-from config import Settings as cfg
+from config.settings import Settings
 
 
+# superclass ABC = AbstractBaseClass
 class Mode(ABC):
 
     def __init__(self, neighbourhood):
@@ -33,12 +34,12 @@ class SandMode(Mode):
 
     def __init__(self):
         super().__init__(Neighbourhood.ExMoore)
-        self.height, self.width = cfg.GRID_HEIGHT, cfg.GRID_WIDTH
+        self.height, self.width = Settings.GRID_HEIGHT, Settings.GRID_WIDTH
         self._y_vel_map = np.zeros((self.height, self.width), dtype=int)
         self.random_directions = np.random.choice(a=[1, -1], size=self.height)
         self.rand_idx = 0
         self.max_rand_idx = self.height - 1
-        self.gravity = cfg.SAND_GRAVITY
+        self.gravity = Settings.SAND_GRAVITY
 
     def update(self, current_grid):
         new_data_grid = np.zeros_like(current_grid)
@@ -66,7 +67,7 @@ class SandMode(Mode):
                 else:
                     if (new_x == x and velocity < -2) or not can_move_down:  # Check diagonal movements
                         can_move_left = new_x > 0 and new_y > 0 and not new_data_grid[new_y - 1, new_x - 1]
-                        can_move_right = new_x < cfg.GRID_WIDTH - 1 and new_y > 0 and not new_data_grid[
+                        can_move_right = new_x < Settings.GRID_WIDTH - 1 and new_y > 0 and not new_data_grid[
                             new_y - 1, new_x + 1]
 
                         if can_move_left and can_move_right:
@@ -91,7 +92,7 @@ class SandMode(Mode):
                     self.rand_idx += 1
             # Update new grid and velocity map
             new_data_grid[new_y, new_x] = True
-            new_y_vel_map[new_y, new_x] = max(velocity, cfg.SAND_MAX_Y_VEL)
+            new_y_vel_map[new_y, new_x] = max(velocity, Settings.SAND_MAX_Y_VEL)
 
         np.random.shuffle(self.random_directions)
         self.changed_cells = np.argwhere(current_grid != new_data_grid)
@@ -219,7 +220,7 @@ class SmoothMode(Mode):
 
     def __init__(self):
         super().__init__(Neighbourhood.Moore)
-        self.neighbour_threshold = 4
+        self.neighbour_threshold = 5
         self._kernel = np.array([
             [1, 1, 1],
             [1, 0, 1],

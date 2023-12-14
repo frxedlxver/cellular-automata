@@ -1,13 +1,12 @@
-import time
 from datetime import datetime
 import numpy as np
 import pyglet
 from pyglet.window import mouse as mouse
-from threading import Thread
 from neighbourhoods import Neighbourhood
-from config import Settings
-from config import Controls
+from config.settings import Settings
+from config.input import Controls
 from direction import Direction as dir
+from gui import GuiManager
 import modes
 
 
@@ -16,6 +15,9 @@ class CellularAutomataWindow(pyglet.window.Window):
     def __init__(self):
         super().__init__()
 
+        self._gui_manager = GuiManager(self)
+
+
         # cached settings
         self._current_mouse_y = None
         self._current_mouse_grid_y = None
@@ -23,16 +25,13 @@ class CellularAutomataWindow(pyglet.window.Window):
         self._current_mouse_x = None
         self._brush = Neighbourhood.get_neighbourhood(Neighbourhood.ExMoore)
 
-        self._color_thread = None
         self._data_grid = None
         self._visual_grid = None
         self.width = Settings.WINDOW_WIDTH
         self.height = Settings.WINDOW_HEIGHT
         self._grid_width = Settings.GRID_WIDTH
         self._grid_height = Settings.GRID_HEIGHT
-        self._grid_size = (Settings.GRID_WIDTH, Settings.GRID_HEIGHT)
-        self._frames_between_visual_updates = 3
-        self._current_frame_in_cycle = 0
+
         self._alive_color = Settings.CELL_STATES[0].color
         self._dead_color = Settings.CELL_STATES[1].color
 
@@ -46,13 +45,13 @@ class CellularAutomataWindow(pyglet.window.Window):
 
         # modes
         self._modes = {
-            'CA': modes.CellularAutomataMode(),
-            'SAND': modes.SandMode(),
-            'RE': modes.ExpandMode(),
-            'ZEBRA': modes.ZebraMode(),
-            'SMOOTH': modes.SmoothMode()
+            Controls.CA_MODE        : modes.CellularAutomataMode(),
+            Controls.SAND_MODE      : modes.SandMode(),
+            Controls.EXPAND_MODE    : modes.ExpandMode(),
+            Controls.ZEBRA_MODE     : modes.ZebraMode(),
+            Controls.TRAIL_MODE    : modes.SmoothMode()
         }
-        self._mode = self._modes['CA']
+        self._mode = self._modes[Controls.CA_MODE]
         self._neighbourhood = self._mode._neighbourhood
 
         # grid
@@ -81,12 +80,7 @@ class CellularAutomataWindow(pyglet.window.Window):
         self._currently_rotating = False
 
         #debug command display
-        self._command_label = pyglet.text.Label('',
-                                                font_name='Times New Roman',
-                                                font_size=20,
-                                                x=self.width // 2, y=25,
-                                                anchor_x='center', anchor_y='bottom',
-                                                batch=self._batch)
+        self._command_label = self._gui_manager.new_command_display(self._batch)
         color_square_size = 10
         fg_label_x_pos = 25
         fg_square_x_pos = fg_label_x_pos + color_square_size
@@ -121,22 +115,8 @@ class CellularAutomataWindow(pyglet.window.Window):
     def toggle_color_rotation(self):
         self._color_rotation_active = not self._color_rotation_active
 
-        # if not self._color_rotation_active and not self._currently_rotating:
-        #     self._color_rotation_active = True
-        # else:
-        #     self._color_rotation_active = False
-
     def toggle_inverse_background_color(self):
         self._inverse_background_color_active = not self._inverse_background_color_active
-
-    def rotate_color_threaded(self):
-        self._currently_rotating = True
-        while self._color_rotation_active:
-            if not self._paused:
-                time.sleep(0.05)
-                self.rotate_to_next_color()
-
-        self._currently_rotating = False
 
     def rotate_to_next_color(self):
         self._r = (self._r + self._dr) % 255
@@ -162,8 +142,8 @@ class CellularAutomataWindow(pyglet.window.Window):
             self._clear_screen_pressed = False
         if self._color_rotation_active:
             self.rotate_to_next_color()
-        if self._inverse_background_color_active:
-            self.bg_color_to_inverse_fg()
+            if self._inverse_background_color_active:
+                self.bg_color_to_inverse_fg()
         self.update_visuals()
 
     def update_data(self):
@@ -253,20 +233,21 @@ class CellularAutomataWindow(pyglet.window.Window):
 
     def on_key_press(self, symbol, modifiers):
 
-        # initializing flags
+        # tracks if user has pressed a button associated with a mode
+        # if they have, we then check to see if they are holding MOD_KEY
+        # if MOD_KEY is held, the rules of the mode will be applied for one frame
+        # else, switch to the mode
         mode_button_pressed = False
-        ctrl_held = False
-        if modifiers & pyglet.window.key.MOD_CTRL:
-            ctrl_held = True
+        mod_key_held = False
+        if modifiers & Controls.MOD_KEY:
+            mod_key_held = True
 
+        # initialize string for label
+        # if key pressed is not a command, label will receive an empty string
         command_description = ''
+        command_key = pyglet.window.key.symbol_string(symbol)
 
         match symbol:
-
-            # sand mode only
-            case Controls.PRINT_BALANCE:
-                self.calculate_and_print_sand_balance()
-
             # cellular automata mode only
             case Controls.NEXT_PRESET:
                 command_description = 'P - NEXT CELLULAR AUTOMATA PRESET'
@@ -275,62 +256,67 @@ class CellularAutomataWindow(pyglet.window.Window):
 
             # all modes
             case Controls.CLEAR_SCREEN:
-                command_description = 'BACKSPACE - CLEAR SCREEN'
+                command_description = 'CLEAR SCREEN'
                 self._clear_screen_pressed = True
             case Controls.SCREENSHOT:
-                command_description = 'S - SCREENSHOT'
+                command_description = 'SCREENSHOT'
                 self.save_screenshot()
             case Controls.TOGGLE_PAUSE:
                 if not self._paused:
                     self.pause()
-                    command_description = 'SPACE - PAUSE'
+                    command_description = 'PAUSE'
                 else:
                     self.resume()
-                    command_description = 'SPACE - RESUME'
+                    command_description = 'RESUME'
             case Controls.ADVANCE_FRAME:
-                command_description = 'ENTER - NEXT FRAME'
+                command_description = 'NEXT FRAME'
                 if not self._paused:
                     self.pause()
                 self.advance_one_frame()
 
             # colors
             case Controls.TOGGLE_COLOR_ROTATION:
-                command_description = 'C - TOGGLE COLOR CHANGING'
+                command_description = 'TOGGLE COLOR CHANGE'
                 if not self._color_rotation_active:
                     command_description += '(ON)'
                 else:
                     command_description += '(OFF)'
                 self.toggle_color_rotation()
             case pyglet.window.key.O:
+                command_description = 'TOGGLE BG COLOR CHANGE'
                 self.toggle_inverse_background_color()
 
             # mode changing
             case Controls.CA_MODE:
-                command_description = '1 - CELLULAR AUTOMATA MODE'
+                command_description = 'CELLULAR AUTOMATA MODE'
                 mode_button_pressed = True
-                mode_key = 'CA'
             case Controls.SAND_MODE:
-                command_description = '2 - SAND MODE'
+                command_description = 'SAND MODE'
                 mode_button_pressed = True
-                mode_key = 'SAND'
             case Controls.ZEBRA_MODE:
-                command_description = '3 - ZEBRA MODE'
+                command_description = 'ZEBRA MODE'
                 mode_button_pressed = True
-                mode_key = 'ZEBRA'
             case Controls.EXPAND_MODE:
-                command_description = '4 - EXPAND MODE'
+                command_description = 'EXPAND MODE'
                 mode_button_pressed = True
-                mode_key = 'RE'
+            case Controls.TRAIL_MODE:
+                command_description = 'TRAIL_MODE'
+                mode_button_pressed = True
             case Controls.SMOOTH:
-                command_description = 'SHIFT - APPLY SMOOTHING'
+                command_description = 'APPLY SMOOTHING'
                 self.apply_smoothing()
 
+        # add command key to command description
+        command_description = command_key + ' - ' + command_description
+
+        # if the button pressed was a mode button, check if we should apply only one frame, or 
         if mode_button_pressed:
-            if ctrl_held:
-                command_description = "CTRL + " + command_description + " (ONE FRAME)"
-                self.apply_one_frame_from_mode(mode_key)
+            if mod_key_held:
+                # modify description if ctrl is held
+                command_description = pyglet.window.key.symbol_string(Controls.MOD_KEY) + command_description + ' (ONE FRAME)'
+                self.apply_one_frame_from_mode(symbol)
             else:
-                self.change_mode(mode_key)
+                self.change_mode(symbol)
 
         self._command_label.text = command_description
 
@@ -347,10 +333,8 @@ class CellularAutomataWindow(pyglet.window.Window):
         self.update(0)
 
     def apply_smoothing(self):
-        self.apply_one_frame_from_mode('SMOOTH')
-
-    def expand(self):
-        self.apply_one_frame_from_mode('RANDOMENCOUNTER')
+        # applying trail mode for a single frame has a smoothing effect
+        self.apply_one_frame_from_mode(Controls.TRAIL_MODE)
 
     def apply_one_frame_from_mode(self, mode_key):
         # cache mode to switch back after update

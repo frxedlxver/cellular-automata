@@ -1,4 +1,3 @@
-from pyglet.window import key
 from cell_state import CellState
 from direction import Direction as dir
 
@@ -7,7 +6,7 @@ class Settings:
     SCREENSHOT_DIRECTORY = ".\\screenshots\\"
 
     SIMULATION_FRAME_RATE = 30
-    SAND_FRAME_RATE = 60
+    SAND_FRAME_RATE = 30
     VISUAL_FRAME_RATE = 30
 
     # cells
@@ -19,8 +18,8 @@ class Settings:
     ]
 
     # grid
-    GRID_HEIGHT = 300
-    GRID_WIDTH = 300
+    GRID_HEIGHT = 200
+    GRID_WIDTH = 200
     GRID_SIZE = (GRID_HEIGHT, GRID_WIDTH)
 
     # visual grid
@@ -42,30 +41,3 @@ class Settings:
     # sand mode
     SAND_GRAVITY = 1
     SAND_MAX_Y_VEL = -10
-
-
-class Controls:
-    # CELLULAR AUTOMATA MODE ONLY
-    NEXT_PRESET = key.P
-    SMOOTH = key.RSHIFT
-
-    # SAND MODE ONLY
-    PRINT_BALANCE = key.B
-
-    # ALL MODES
-    CLEAR_SCREEN = key.BACKSPACE
-    TOGGLE_PAUSE = key.SPACE
-    ADVANCE_FRAME = key.ENTER
-    SCREENSHOT = key.S
-
-    # MODE SELECTION
-    CA_MODE = key._1
-    SAND_MODE = key._2
-    ZEBRA_MODE = key._3
-    EXPAND_MODE = key._4
-    SMOOTH_MODE = key._5
-
-    # COLORS
-    TOGGLE_COLOR_ROTATION = key.C
-    INCREASE_COLOR_SPEED = key.BRACKETRIGHT
-    DECREASE_COLOR_SPEED = key.BRACKETLEFT
