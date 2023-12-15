@@ -1,6 +1,6 @@
 from cell_state import CellState
 from direction import Direction as dir
-
+from config.input import Input
 
 class Settings:
     SCREENSHOT_DIRECTORY = ".\\screenshots\\"
@@ -9,12 +9,15 @@ class Settings:
     SAND_FRAME_RATE = 30
     VISUAL_FRAME_RATE = 30
 
+    DEFAULT_MODE = Input.CA_MODE
+
     # cells
     CELL_HEIGHT = 2
     CELL_WIDTH = 2
+
     CELL_STATES = [
-        CellState('Alive', (120, 120, 30, 255)),
-        CellState('Dead', (40, 40, 40, 255))
+        CellState('Alive'),
+        CellState('Dead')
     ]
 
     # grid

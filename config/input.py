@@ -1,12 +1,13 @@
 from pyglet.window import key
 
-class Controls:
+class Input:
     # CELLULAR AUTOMATA MODE ONLY
     NEXT_PRESET = key.P
     SMOOTH = key.RSHIFT
 
     # ALL MODES
     CLEAR_SCREEN = key.BACKSPACE
+    REPOPULATE = key.R
     TOGGLE_PAUSE = key.SPACE
     ADVANCE_FRAME = key.ENTER
     SCREENSHOT = key.S
@@ -20,5 +21,6 @@ class Controls:
     TRAIL_MODE = key._5
 
     # COLORS
-    TOGGLE_COLOR_ROTATION = key.C
-    TOGGLE_BACKGROUND_COLOR_ROTATION = key.B
+    TOGGLE_FG_COLOR_ROTATION = key.C
+    TOGGLE_BG_COLOR_ROTATION = key.B
+    TOGGLE_INVERSE_BG_COLOR = key.I

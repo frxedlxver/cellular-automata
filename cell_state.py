@@ -1,4 +1,3 @@
 class CellState:
-    def __init__(self, name, color):
+    def __init__(self, name):
         self.name = name
-        self.color = color

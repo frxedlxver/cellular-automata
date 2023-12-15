@@ -4,113 +4,58 @@ import pyglet
 from pyglet.window import mouse as mouse
 from neighbourhoods import Neighbourhood
 from config.settings import Settings
-from config.input import Controls
+from config.input import Input
 from direction import Direction as dir
 from gui import GuiManager
+from color_controller import ColorController
+from cell_data_controller import CellDataController
 import modes
 
 
 class CellularAutomataWindow(pyglet.window.Window):
 
     def __init__(self):
+
+        # pyglet stuff
         super().__init__()
 
-        self._gui_manager = GuiManager(self)
+        self.fps = pyglet.window.FPSDisplay(self)
+        self._batch = pyglet.graphics.Batch()
+        self.width = Settings.WINDOW_WIDTH
+        self.height = Settings.WINDOW_HEIGHT
 
-
-        # cached settings
+        # cached data
         self._current_mouse_y = None
         self._current_mouse_grid_y = None
         self._current_mouse_grid_x = None
         self._current_mouse_x = None
+        self._cells_changed_by_click = np.empty((0, 2), dtype=int)
         self._brush = Neighbourhood.get_neighbourhood(Neighbourhood.ExMoore)
-
-        self._data_grid = None
-        self._visual_grid = None
-        self.width = Settings.WINDOW_WIDTH
-        self.height = Settings.WINDOW_HEIGHT
         self._grid_width = Settings.GRID_WIDTH
         self._grid_height = Settings.GRID_HEIGHT
 
-        self._alive_color = Settings.CELL_STATES[0].color
-        self._dead_color = Settings.CELL_STATES[1].color
-
-        # pyglet
-        self._batch = pyglet.graphics.Batch()
-
         # flags
-        self.mouse_held = False
+        self._mouse_held = False
         self._paused = False
         self._clear_screen_pressed = False
-
-        # modes
-        self._modes = {
-            Controls.CA_MODE        : modes.CellularAutomataMode(),
-            Controls.SAND_MODE      : modes.SandMode(),
-            Controls.EXPAND_MODE    : modes.ExpandMode(),
-            Controls.ZEBRA_MODE     : modes.ZebraMode(),
-            Controls.TRAIL_MODE    : modes.SmoothMode()
-        }
-        self._mode = self._modes[Controls.CA_MODE]
-        self._neighbourhood = self._mode._neighbourhood
-
-        # grid
-        self.initialize_data_grid()
-        self.initialize_visual_grid()
-        self.velocity_map = {}
+        self._repopulate_pressed = False
 
         # array for tracking cells changed by click, used in updating visual grid
-        self._cells_changed_by_click = np.empty((0, 2), dtype=int)
+        self._color_ctrl = ColorController()
 
-        # current color values
-        self._r = 0
-        self._g = 0
-        self._b = 0
+        # grid
+        self._data_controller = CellDataController()
+        self._data_controller.initialize_data_grid()
+        self.initialize_visual_grid()
 
-        # amount by which colors change each frame (d = delta)
-        self._dr = 4
-        self._dg = 2
-        self._db = 1
+ 
 
         # flag used outside of color thread to cause color loop to break
         self._color_rotation_active = False
         self._inverse_background_color_active = False
-
-        # separate flag that is used by the thread to indicate whether it has exited
-        self._currently_rotating = False
-
-        #debug command display
-        self._command_label = self._gui_manager.new_command_display(self._batch)
-        color_square_size = 10
-        fg_label_x_pos = 25
-        fg_square_x_pos = fg_label_x_pos + color_square_size
-        bg_label_x_pos = fg_square_x_pos + color_square_size + color_square_size
-        bg_square_x_pos = bg_label_x_pos + color_square_size
-        color_display_y_pos = self._height - 25
-
-        self._fg_color_label = pyglet.text.Label('fg:',
-                                                font_name='Times New Roman',
-                                                font_size=10,
-                                                x=fg_label_x_pos, y=color_display_y_pos,
-                                                anchor_x='center', anchor_y='bottom',
-                                                batch=self._batch)
-
-        self._fg_color_square = pyglet.shapes.Rectangle(x=fg_square_x_pos, y=color_display_y_pos,
-                                    width= color_square_size, height=color_square_size,
-                                    color=self._alive_color, batch=self._batch)
-
-
         
-        self._bg_color_label = pyglet.text.Label('bg:',
-                                                font_name='Times New Roman',
-                                                font_size=10,
-                                                x=bg_label_x_pos, y=color_display_y_pos,
-                                                anchor_x='center', anchor_y='bottom',
-                                                batch=self._batch)
-        
-        self._bg_color_square = pyglet.shapes.Rectangle(x=bg_square_x_pos, y=color_display_y_pos,
-                                    width=10, height=10,
-                                    color=self._dead_color, batch=self._batch)
+        self._gui_manager = GuiManager(self, self._batch)
+        self._gui_manager.initialize_elements()
 
     def toggle_color_rotation(self):
         self._color_rotation_active = not self._color_rotation_active
@@ -118,57 +63,35 @@ class CellularAutomataWindow(pyglet.window.Window):
     def toggle_inverse_background_color(self):
         self._inverse_background_color_active = not self._inverse_background_color_active
 
-    def rotate_to_next_color(self):
-        self._r = (self._r + self._dr) % 255
-        self._g = (self._g + self._dg) % 255
-        self._b = (self._b + self._db) % 255
-        self._alive_color = (self._r, self._g, self._b, 255)
-        self._fg_color_square.color = self._alive_color
-
-    def bg_color_to_inverse_fg(self):
-        self._dead_color = (
-            255 - self._r,
-            255 - self._g,
-            255 - self._b,
-            255
-        )
-        self._bg_color_square.color = self._dead_color
-
 
     def update(self, dt):
-        self.update_data()
+        self._data_controller.update()
+        self.update_intermediates()
+        self.update_visualization()
+
+    # anything that needs to be done between data and visual updates
+    def update_intermediates(self):
+        self._color_ctrl.update()
         if self._clear_screen_pressed:
-            self.clear_screen()
+            self._data_controller.clear_screen()
             self._clear_screen_pressed = False
-        if self._color_rotation_active:
-            self.rotate_to_next_color()
-            if self._inverse_background_color_active:
-                self.bg_color_to_inverse_fg()
-        self.update_visuals()
+        if self._repopulate_pressed:
+            self._data_controller.clear_screen()
+            self._data_controller.initialize_data_grid()
+            self._repopulate_pressed = False
+        
+    def update_visualization(self):
+        # cache values for faster access
+        fg = self._color_ctrl.fg
+        bg = self._color_ctrl.bg
 
-    def update_data(self):
-        # update data grid every frame
-        self._data_grid = self._mode.update(self._data_grid)
-
-    def update_visuals(self):
-        changed_cells = np.unique(np.vstack([self._mode.changed_cells, self._cells_changed_by_click]), axis=0)
+        changed_cells = self._data_controller.get_changed_cells()
 
         if changed_cells.size > 0:
             # Update only the cells in the changed_cells set
             for y, x in changed_cells:
-                self._visual_grid[y, x].color = self._alive_color if self._data_grid[y, x] else self._dead_color
+                self._visual_grid[y, x].color = fg if self._data_controller._data_grid[y, x] else bg
 
-        # Reset the click changes after updating
-        self._cells_changed_by_click = np.empty((0, 2), dtype=int)
-
-    def initialize_data_grid(self):
-        self._data_grid = np.random.randint(0, len(Settings.CELL_STATES),
-                                            size=(Settings.GRID_HEIGHT, Settings.GRID_WIDTH))
-        np.random.randint(0, 3)
-        for y in range(Settings.GRID_HEIGHT):
-            for x in range(Settings.GRID_WIDTH):
-                # set cell as alive if random float falls between 0 and INITIAL_LIFE_CHANCE
-                self._data_grid[y][x] = np.random.rand() < Settings.INITIAL_LIFE_CHANCE
 
     def initialize_visual_grid(self):
         self._visual_grid = np.empty((Settings.GRID_HEIGHT, Settings.GRID_WIDTH), dtype=object)
@@ -178,12 +101,15 @@ class CellularAutomataWindow(pyglet.window.Window):
         adjusted_x_values = np.arange(stop=Settings.VISUAL_GRID_WIDTH + Settings.CELL_WIDTH, step=Settings.CELL_WIDTH) + \
                             Settings.WINDOW_MARGIN[dir.Left]
 
+        fg = self._color_ctrl.fg
+        bg = self._color_ctrl.bg
+
         for y in range(Settings.GRID_HEIGHT):
             y_pos_in_window = adjusted_y_values[y]
             for x in range(Settings.GRID_WIDTH):
                 x_pos_in_window = adjusted_x_values[x]
-                cell_state = self._data_grid[y, x]
-                color = self._alive_color if cell_state else self._dead_color
+                cell_state = self._data_controller.state_at(y, x)
+                color = fg if cell_state else bg
                 cell = pyglet.shapes.Rectangle(x=x_pos_in_window, y=y_pos_in_window,
                                                width=Settings.CELL_WIDTH, height=Settings.CELL_HEIGHT,
                                                color=color, batch=self._batch)
@@ -192,9 +118,10 @@ class CellularAutomataWindow(pyglet.window.Window):
     def on_draw(self):
         self.clear()
         self._batch.draw()
+        self.fps.draw()
 
     def on_mouse_press(self, x, y, button, modifiers):
-        self.mouse_held = True
+        self._mouse_held = True
         self.update_cached_mouse_position(x, y)
 
         # Unschedule any existing task before scheduling a new one
@@ -205,28 +132,31 @@ class CellularAutomataWindow(pyglet.window.Window):
         pyglet.clock.schedule_interval(self.apply_click_effect, 1 / Settings.SIMULATION_FRAME_RATE, new_cell_state)
 
     def on_mouse_drag(self, x, y, dx, dy, buttons, modifiers):
-        if self.mouse_held:
+        if self._mouse_held:
             if (abs(self._current_mouse_x - x) >= Settings.CELL_WIDTH or abs(
                     self._current_mouse_y - y) >= Settings.CELL_HEIGHT):
                 self.update_cached_mouse_position(x, y)
 
     def on_mouse_release(self, x, y, button, modifiers):
-        self.mouse_held = False
+        self._mouse_held = False
         pyglet.clock.unschedule(self.apply_click_effect)
 
     def update_cached_mouse_position(self, x, y):
         self._current_mouse_x, self._current_mouse_y = x, y
-        self._current_mouse_grid_x, self._current_mouse_grid_y = self.mouse_to_grid_pos(x, y)
+        self._current_mouse_grid_x, self._current_mouse_grid_y = self.convert_mouse_to_grid_pos(x, y)
 
     def apply_click_effect(self, dt, new_cell_state):
+        cells_to_update = []
+
         for dx, dy in self._brush:
             nx, ny = self._current_mouse_grid_x + dx, self._current_mouse_grid_y + dy
-            if self.in_grid(nx, ny):
-                self._data_grid[ny][nx] = new_cell_state
-                self._cells_changed_by_click = np.vstack([self._cells_changed_by_click, [ny, nx]])
+            if self._data_controller.in_grid(nx, ny):  # Assuming in_grid is a method that checks if the cell is within the grid bounds
+                cells_to_update.append((ny, nx))
+
+        self._data_controller.set_cell_states(cells_to_update, new_cell_state)
 
         if self._paused:
-            self.update_visuals()
+            self.update_visualization()
 
     def in_grid(self, x, y):
         return 0 <= x < self._grid_width and 0 <= y < self._grid_height
@@ -239,7 +169,7 @@ class CellularAutomataWindow(pyglet.window.Window):
         # else, switch to the mode
         mode_button_pressed = False
         mod_key_held = False
-        if modifiers & Controls.MOD_KEY:
+        if modifiers & Input.MOD_KEY:
             mod_key_held = True
 
         # initialize string for label
@@ -249,60 +179,82 @@ class CellularAutomataWindow(pyglet.window.Window):
 
         match symbol:
             # cellular automata mode only
-            case Controls.NEXT_PRESET:
+            case Input.NEXT_PRESET:
                 command_description = 'P - NEXT CELLULAR AUTOMATA PRESET'
-                if isinstance(self._mode, modes.CellularAutomataMode):
-                    self._mode.next_preset()
+                self._data_controller.next_ca_preset()
 
             # all modes
-            case Controls.CLEAR_SCREEN:
+            case Input.CLEAR_SCREEN:
                 command_description = 'CLEAR SCREEN'
                 self._clear_screen_pressed = True
-            case Controls.SCREENSHOT:
+            case Input.REPOPULATE:
+                command_description = 'RANDOM REPOPULATION'
+                self._repopulate_pressed = True
+            case Input.SCREENSHOT:
                 command_description = 'SCREENSHOT'
                 self.save_screenshot()
-            case Controls.TOGGLE_PAUSE:
+            case Input.TOGGLE_PAUSE:
                 if not self._paused:
                     self.pause()
                     command_description = 'PAUSE'
                 else:
                     self.resume()
                     command_description = 'RESUME'
-            case Controls.ADVANCE_FRAME:
+            case Input.ADVANCE_FRAME:
                 command_description = 'NEXT FRAME'
                 if not self._paused:
                     self.pause()
-                self.advance_one_frame()
+                self.update(0)
 
             # colors
-            case Controls.TOGGLE_COLOR_ROTATION:
-                command_description = 'TOGGLE COLOR CHANGE'
-                if not self._color_rotation_active:
+            case Input.TOGGLE_FG_COLOR_ROTATION:
+                command_description = 'TOGGLE FG COLOR CHANGE'
+                if not self._color_ctrl.fg_color_rotation_active:
                     command_description += '(ON)'
                 else:
                     command_description += '(OFF)'
-                self.toggle_color_rotation()
-            case pyglet.window.key.O:
+                self._color_ctrl.toggle_fg_color_rotation()
+
+            case Input.TOGGLE_BG_COLOR_ROTATION:
                 command_description = 'TOGGLE BG COLOR CHANGE'
-                self.toggle_inverse_background_color()
+                if not self._color_ctrl.bg_color_rotation_active:
+                    command_description += '(ON)'
+                else:
+                    command_description += '(OFF)'
+                self._color_ctrl.toggle_bg_color_rotation()
+
+                if self._color_ctrl.bg_as_inverse_fg_active:
+                    self._color_ctrl.toggle_inverse_background_color()
+
+            case Input.TOGGLE_INVERSE_BG_COLOR:
+                command_description = 'TOGGLE INVERSE BG COLOR'
+                if not self._color_ctrl.bg_as_inverse_fg_active:
+                    command_description += '(ON)'
+                else:
+                    command_description += '(OFF)'
+                self._color_ctrl.toggle_inverse_background_color()
+
+                if self._color_ctrl.bg_color_rotation_active:
+                    self._color_ctrl.toggle_bg_color_rotation()
+
 
             # mode changing
-            case Controls.CA_MODE:
+            case Input.CA_MODE:
                 command_description = 'CELLULAR AUTOMATA MODE'
                 mode_button_pressed = True
-            case Controls.SAND_MODE:
+            case Input.SAND_MODE:
                 command_description = 'SAND MODE'
                 mode_button_pressed = True
-            case Controls.ZEBRA_MODE:
+            case Input.ZEBRA_MODE:
                 command_description = 'ZEBRA MODE'
                 mode_button_pressed = True
-            case Controls.EXPAND_MODE:
+            case Input.EXPAND_MODE:
                 command_description = 'EXPAND MODE'
                 mode_button_pressed = True
-            case Controls.TRAIL_MODE:
+            case Input.TRAIL_MODE:
                 command_description = 'TRAIL_MODE'
                 mode_button_pressed = True
-            case Controls.SMOOTH:
+            case Input.SMOOTH:
                 command_description = 'APPLY SMOOTHING'
                 self.apply_smoothing()
 
@@ -313,12 +265,12 @@ class CellularAutomataWindow(pyglet.window.Window):
         if mode_button_pressed:
             if mod_key_held:
                 # modify description if ctrl is held
-                command_description = pyglet.window.key.symbol_string(Controls.MOD_KEY) + command_description + ' (ONE FRAME)'
+                command_description = pyglet.window.key.symbol_string(Input.MOD_KEY) + command_description + ' (ONE FRAME)'
                 self.apply_one_frame_from_mode(symbol)
             else:
-                self.change_mode(symbol)
+                self._data_controller.set_mode(symbol)
 
-        self._command_label.text = command_description
+        self._gui_manager.update_command_label(command_description)
 
 
     @staticmethod
@@ -327,32 +279,19 @@ class CellularAutomataWindow(pyglet.window.Window):
         image_path = Settings.SCREENSHOT_DIRECTORY + "screenshot_" + now + ".png"
         pyglet.image.get_buffer_manager().get_color_buffer().save(image_path)
 
-    def advance_one_frame(self):
-        if self._color_rotation_active:
-            self.rotate_to_next_color()
-        self.update(0)
-
     def apply_smoothing(self):
         # applying trail mode for a single frame has a smoothing effect
-        self.apply_one_frame_from_mode(Controls.TRAIL_MODE)
+        self.apply_one_frame_from_mode(Input.TRAIL_MODE)
 
     def apply_one_frame_from_mode(self, mode_key):
-        # cache mode to switch back after update
-        cached_mode = self._mode
-
-        # switch to trail mode and update one frame
-        self._mode = self._modes[mode_key]
+        self._data_controller.set_temporary_mode(mode_key)
         self.update(0)
-
-        # switch back to original mode
-        self._mode = cached_mode
+        self._data_controller.exit_temporary_mode()
 
     def change_mode(self, mode_key):
         self._mode = self._modes[mode_key]
 
-    def clear_screen(self):
-        self._data_grid = np.zeros_like(self._data_grid, dtype=bool)
-        self._mode.changed_cells = np.argwhere(self._data_grid == False)
+    # todo: move to data controller
 
     def pause(self):
         self.running = False
@@ -364,7 +303,7 @@ class CellularAutomataWindow(pyglet.window.Window):
         pyglet.clock.schedule(self.update)
         self._paused = False
 
-    def mouse_to_grid_pos(self, mouse_x, mouse_y):
+    def convert_mouse_to_grid_pos(self, mouse_x, mouse_y):
         grid_x = (mouse_x - Settings.WINDOW_MARGIN[dir.Left]) // Settings.CELL_WIDTH
         grid_y = (mouse_y - Settings.WINDOW_MARGIN[dir.Top]) // Settings.CELL_HEIGHT
         return grid_x, grid_y
