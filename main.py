@@ -282,7 +282,7 @@ class CellularAutomataWindow(pyglet.window.Window):
                 else:
                     command_description += '(OFF)'
                 self.toggle_color_rotation()
-            case pyglet.window.key.O:
+            case Controls.TOGGLE_BACKGROUND_COLOR_ROTATION:
                 command_description = 'TOGGLE BG COLOR CHANGE'
                 self.toggle_inverse_background_color()
 

@@ -10,16 +10,16 @@ class Settings:
     VISUAL_FRAME_RATE = 30
 
     # cells
-    CELL_HEIGHT = 2
-    CELL_WIDTH = 2
+    CELL_HEIGHT = 4
+    CELL_WIDTH = 4
     CELL_STATES = [
         CellState('Alive', (120, 120, 30, 255)),
         CellState('Dead', (40, 40, 40, 255))
     ]
 
     # grid
-    GRID_HEIGHT = 200
-    GRID_WIDTH = 200
+    GRID_HEIGHT = 180
+    GRID_WIDTH = 320
     GRID_SIZE = (GRID_HEIGHT, GRID_WIDTH)
 
     # visual grid
